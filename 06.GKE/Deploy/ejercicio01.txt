@@ -1,0 +1,164 @@
+gcloud config set project mygkeproject-381022
+export PROJECT_ID=`gcloud config list --format="value(core.project)"`
+
+gcloud config set compute/region us-central1
+gcloud config set compute/zone us-central1-c
+export REGION=us-central1
+export ZONE=us-central1-c
+
+gcloud compute networks create k8s-proxy --subnet-mode=custom
+
+gcloud compute networks subnets create subnet-cluster --network=k8s-proxy --range=10.50.0.0/16
+
+gcloud compute instances create --subnet=subnet-cluster --scopes cloud-platform proxy-temp
+
+export CLIENT_IP=`gcloud compute instances describe proxy-temp --format="value(networkInterfaces[0].networkIP)"`
+
+gcloud compute firewall-rules create k8s-proxy-ssh --network k8s-proxy --allow tcp:22
+
+gcloud container clusters create frobnitz  \
+    --master-ipv4-cidr=172.16.0.64/28 \
+    --network k8s-proxy \
+    --subnetwork=subnet-cluster \
+    --enable-ip-alias \
+    --enable-private-nodes \
+    --enable-private-endpoint \
+    --master-authorized-networks $CLIENT_IP/32 \
+    --enable-master-authorized-networks
+
+mkdir k8s-api-proxy && cd k8s-api-proxy
+
+
+#---Dockerfile
+FROM alpine
+
+RUN apk add -U curl privoxy jq && \
+    mv /etc/privoxy/templates /etc/privoxy-templates && \
+    rm -rf /var/cache/apk/* /etc/privoxy/* && \
+    mv /etc/privoxy-templates /etc/privoxy/templates
+ADD --chown=privoxy:privoxy config \
+    /etc/privoxy/
+ADD --chown=privoxy:privoxy k8s-only.action \
+    /etc/privoxy/
+ADD --chown=privoxy:privoxy k8s-rewrite-internal.filter \
+    /etc/privoxy/
+ADD k8s-api-proxy.sh /
+
+EXPOSE 8118/tcp
+
+ENTRYPOINT ["./k8s-api-proxy.sh"]
+
+#------- config
+
+#config directory
+confdir /etc/privoxy
+# Allow Kubernetes API access only
+actionsfile /etc/privoxy/k8s-only.action
+# Rewrite https://CLUSTER_IP to https://kubernetes.default
+filterfile /etc/privoxy/k8s-rewrite-internal.filter
+# Don't show the pod name in errors
+hostname k8s-privoxy
+# Bind to all interfaces, port :8118
+listen-address  :8118
+# User cannot click-through a block
+enforce-blocks 1
+# Allow more than one outbound connection
+tolerate-pipelining 1
+
+#------k8s-only.action
+# Block everything...
+{+block{Not Kubernetes}}
+/
+
+# ... except the internal k8s endpoint, which you rewrite (see
+# k8s-rewrite-internal.filter).
+{+client-header-filter{k8s-rewrite-internal} -block{Kubernetes}}
+CLUSTER_IP/
+
+#--- k8s-rewrite-internal.filter
+
+CLIENT-HEADER-FILTER: k8s-rewrite-internal\
+ Rewrite https://CLUSTER_IP/ to https://kubernetes.default/
+s@(CONNECT) CLUSTER_IP:443\
+ (HTTP/\d\.\d)@$1 kubernetes.default:443 $2@ig
+
+#-- k8s-api-proxy.sh
+#!/bin/sh
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+# Get the internal cluster IP
+export TOKEN=$(cat /run/secrets/kubernetes.io/serviceaccount/token)
+INTERNAL_IP=$(curl -H "Authorization: Bearer $TOKEN" -k -SsL https://kubernetes.default/api |
+jq -r '.serverAddressByClientCIDRs[0].serverAddress')
+
+# Replace CLUSTER_IP in the rewrite filter and action file
+sed -i "s/CLUSTER_IP/${INTERNAL_IP}/g"\
+ /etc/privoxy/k8s-rewrite-internal.filter
+sed -i "s/CLUSTER_IP/${INTERNAL_IP}/g"\
+ /etc/privoxy/k8s-only.action
+
+# Start Privoxy un-daemonized
+privoxy --no-daemon /etc/privoxy/config
+
+
+chmod +x k8s-api-proxy.sh
+
+docker build -t gcr.io/$PROJECT_ID/k8s-api-proxy:0.1 .
+docker push gcr.io/$PROJECT_ID/k8s-api-proxy:0.1
+
+
+gcloud compute ssh proxy-temp
+
+@en vm creada
+sudo apt-get install kubectl
+export PROJECT_ID=`gcloud config list --format="value(core.project)"`
+gcloud container clusters get-credentials frobnitz \
+--zone us-central1-c --internal-ip
+
+sudo apt-get install google-cloud-cli-gke-gcloud-auth-plugin
+
+kubectl run k8s-api-proxy \
+    --image=gcr.io/$PROJECT_ID/k8s-api-proxy:0.1 \
+    --port=8118
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    run: k8s-api-proxy
+  name: k8s-api-proxy
+  namespace: default
+  annotations:
+    cloud.google.com/load-balancer-type: "Internal"
+spec:
+  ports:
+  - port: 8118
+    protocol: TCP
+    targetPort: 8118
+  selector:
+    run: k8s-api-proxy
+  type: LoadBalancer
+
+
+kubectl create -f ilb.yaml
+kubectl get service/k8s-api-proxy
+
+export LB_IP=`kubectl get  service/k8s-api-proxy \
+-o jsonpath='{.status.loadBalancer.ingress[].ip}'`
+
+export CONTROLLER_IP=`gcloud container clusters describe frobnitz \
+--zone=us-central1-c \
+--format="get(privateClusterConfig.privateEndpoint)"`
+
+
+
+export https_proxy=$LB_IP:8118
+
+kubectl get pods
+
+
+
+
