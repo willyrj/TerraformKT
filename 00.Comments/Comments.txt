@@ -1,0 +1,29 @@
+Iac definition
+Software in order deploy iac as code --> reuse code DRY (dont repeat yourself)
+Infrastucture described in our code.
+No Manual - Consistency - Predictable. --
+Terraform Hashicorp ()
+Agnostic (GCP-AWS-Azure-OCI- Vmware - K8s)
+HCL Hashicorp Configuration Language.
+Declarative vs Imperative
+--
+Idempotence and Consistency.
+Push & Pull
+Terraform work with State File
+Idempotence
+Dependencies
+Performance
+Collaboration
+
+Terraform: plugin based architecture
+           providers (allows us to interact wiht an environment)
+           snapins (use multiple different providers / multiple instance of a provider)
+           Written with Go.
+
+Providers: for near all cloud environemts 
+           public or private repositories.
+           registry.terraform.io
+           3 classes : official, verified , community
+
+
+
