@@ -25,5 +25,40 @@ Providers: for near all cloud environemts
            registry.terraform.io
            3 classes : official, verified , community
 
+Working Environment:
+Allow to install it at any OS
+
+	1. Get a shell
+	2. Download and install GCP SDK - https://cloud.google.com/sdk/docs/install
+	3. Download Terraform - https://developer.hashicorp.com/terraform/downloads
+	4. Optional -Configure path
+	5. Install code editor - https://code.visualstudio.com/
+	6. Install Git https://git-scm.com/downloads
+	7. Create a local repo (Github, Gitlab, Azure Devops, GCP Cloud Source). / Clone existing repo
+S
+
+Provider could be on public or private repository.
+	Auto downloaded
+	registry.terraform.io
+    have three classes: official, verified and community.
+
+Terraform commands
+
+Terraform -help
+Terraform fmt [options] [DIR]
+Terraform validate
+Terraform init
+Terraform plan
+Terraform apply
+
+Terraform state
+Terraform console
+
+
+tart working.
+
+
+
+
 
 
