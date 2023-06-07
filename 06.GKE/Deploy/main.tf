@@ -46,6 +46,7 @@ module "myproject-default-service-accounts" {
   iam_project_roles = {
     "${var.project_id}" = [
       "roles/container.clusterAdmin",
+      "roles/container.Admin",
       "roles/logging.logWriter",
       "roles/monitoring.metricWriter",
     ]
@@ -103,7 +104,7 @@ module "gke-cluster-1-nodepool-1" {
   cluster_name = var.gke_cluster_name
   location     = var.gke_cluster_location
   name         = var.gke_pool1_name
- labels       = { environment = "dev" }
+  labels       = { environment = "dev" }
   service_account = {
     create       = true
     email        = "${var.gke_pool1_name}" # optional

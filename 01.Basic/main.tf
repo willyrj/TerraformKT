@@ -8,12 +8,12 @@ variable "gcp_region" {
 variable "gcp_project" {
   type        = string
   description = "GCP project name"
-  default     = "hub01-379813"
+  default     = "testing01-387705"
 }
 variable "bucket-name" {
   type        = string
   description = "The name of the Google Storage Bucket to create"
-  default     = "terraform-gcp-devops-test-372212"
+  default     = "terraform-gcp-devops-test-372212a"
 }
 variable "storage-class" {
   type        = string
